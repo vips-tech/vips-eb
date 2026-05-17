@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TNEB Bill Calculator – Tamil Nadu 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-logo">⚡</div>
+        <div>
+          <div class="brand-name">TNEB Bill Calculator</div>
+          <div class="brand-sub">TANGEDCO · Domestic Consumer</div>
+        </div>
+      </div>
+      <button class="theme-btn" id="themeToggle" title="Toggle theme">
+        <span id="themeIcon">☀️</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- PAGE HERO -->
+  <div class="page-hero">
+    <div class="hero-pill">🎉 CM Vijay's 200 Units Free Scheme — Active from May 2026</div>
+    <h1>How much is your <span class="accent">electricity bill?</span></h1>
+    <p>Enter your bi-monthly meter reading and instantly compare your old bill vs the new 2026 scheme.</p>
+  </div>
+
+  <main class="page-body">
+
+    <!-- ── STEP 1: INPUT ── -->
+    <section class="section-card" id="inputSection">
+      <div class="section-label">Step 1 — Enter Your Reading</div>
+
+      <div class="input-row">
+        <div class="field">
+          <label for="units">Units Consumed <span class="field-note">(bi-monthly)</span></label>
+          <div class="field-input">
+            <input type="number" id="units" placeholder="e.g. 450" min="0" max="9999" autocomplete="off" />
+            <span class="field-badge">kWh</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="consumerType">Consumer Type</label>
+          <div class="field-input">
+            <select id="consumerType">
+              <option value="domestic">🏠 Domestic (LT-1)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Eligibility notice -->
+      <div id="eligibilityBanner" class="notice" style="display:none;">
+        <span id="eligIcon"></span>
+        <span id="eligText"></span>
+      </div>
+
+      <div class="action-row">
+        <button class="btn-calc" onclick="calculate()">⚡ Calculate Bill</button>
+        <button class="btn-reset" onclick="resetAll()">↺ Reset</button>
+      </div>
+    </section>
+
+    <!-- ── STEP 2: RESULTS ── -->
+    <section id="resultsSection" style="display:none;">
+
+      <!-- Summary strip -->
+      <div class="result-strip">
+        <div class="result-tile tile-old">
+          <div class="tile-label">Old Bill</div>
+          <div class="tile-amount" id="oldBillDisplay">₹0</div>
+          <div class="tile-note">100 units free</div>
+        </div>
+        <div class="result-tile tile-new">
+          <div class="tile-label">New Bill</div>
+          <div class="tile-amount" id="newBillDisplay">₹0</div>
+          <div class="tile-note">200 units free (2026)</div>
+        </div>
+        <div class="result-tile tile-save">
+          <div class="tile-label">You Save</div>
+          <div class="tile-amount" id="savingsDisplay">₹0</div>
+          <div class="tile-note" id="savingsPct">0% savings</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts-grid">
+        <div class="section-card chart-wrap">
+          <div class="chart-title">Bill Comparison</div>
+          <div class="chart-box"><canvas id="barChart"></canvas></div>
+        </div>
+        <div class="section-card chart-wrap">
+          <div class="chart-title">Savings Breakdown</div>
+          <div class="chart-box"><canvas id="pieChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Slab breakdown -->
+      <div class="section-card">
+        <div class="breakdown-top">
+          <div class="section-label" style="margin-bottom:0;">Detailed Slab Breakdown</div>
+          <button class="btn-toggle" onclick="toggleBreakdown()">
+            <span id="breakdownToggleText">Show Details ▾</span>
+          </button>
+        </div>
+
+        <div id="breakdownContent" style="display:none; margin-top:1.25rem;">
+          <div class="tab-row">
+            <button class="tab active" onclick="switchTab('old')">Old Bill</button>
+            <button class="tab" onclick="switchTab('new')">New Bill (2026)</button>
+          </div>
+
+          <div id="oldBreakdown">
+            <table class="slab-table">
+              <thead><tr><th>Slab (Units)</th><th>Units Used</th><th>Rate / Unit</th><th>Amount</th></tr></thead>
+              <tbody id="oldBreakdownBody"></tbody>
+              <tfoot id="oldBreakdownFoot"></tfoot>
+            </table>
+          </div>
+          <div id="newBreakdown" style="display:none;">
+            <table class="slab-table">
+              <thead><tr><th>Slab (Units)</th><th>Units Used</th><th>Rate / Unit</th><th>Amount</th></tr></thead>
+              <tbody id="newBreakdownBody"></tbody>
+              <tfoot id="newBreakdownFoot"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Export -->
+      <button class="btn-pdf" onclick="exportPDF()">📄 Download Bill as PDF</button>
+
+    </section>
+
+    <!-- ── TARIFF REFERENCE ── -->
+    <section class="section-card tariff-ref">
+      <div class="section-label">Tariff Reference — TANGEDCO LT-1 Domestic</div>
+      <div class="tariff-grid">
+        <div>
+          <div class="tariff-head">Energy Charges (Bi-Monthly)</div>
+          <table class="ref-table">
+            <thead><tr><th>Units</th><th>Rate (₹ / unit)</th></tr></thead>
+            <tbody>
+              <tr><td>0 – 100</td><td class="free-tag">FREE</td></tr>
+              <tr><td>101 – 200</td><td>₹ 2.35</td></tr>
+              <tr><td>201 – 400</td><td>₹ 4.80</td></tr>
+              <tr><td>401 – 500</td><td>₹ 6.45</td></tr>
+              <tr><td>501 – 600</td><td>₹ 8.55</td></tr>
+              <tr><td>601 – 800</td><td>₹ 9.65</td></tr>
+              <tr><td>801 – 1000</td><td>₹ 10.30</td></tr>
+              <tr><td>Above 1000</td><td>₹ 11.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div class="tariff-head">Fixed Charges (Bi-Monthly)</div>
+          <table class="ref-table">
+            <thead><tr><th>Consumption</th><th>Fixed Charge</th></tr></thead>
+            <tbody>
+              <tr><td>0 – 100 units</td><td class="free-tag">₹ 0</td></tr>
+              <tr><td>101 – 200 units</td><td>₹ 40</td></tr>
+              <tr><td>201 – 500 units</td><td>₹ 75</td></tr>
+              <tr><td>501 – 1000 units</td><td>₹ 125</td></tr>
+              <tr><td>Above 1000 units</td><td>₹ 175</td></tr>
+            </tbody>
+          </table>
+          <div class="scheme-box">
+            <div class="scheme-row"><span class="dot dot-red"></span><strong>Old Scheme:</strong> First 100 units free for all consumers</div>
+            <div class="scheme-row"><span class="dot dot-green"></span><strong>New Scheme (2026):</strong> First 200 units free if consumption ≤ 500 units/bimonth</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>⚡ TNEB Bill Calculator &nbsp;|&nbsp; TANGEDCO LT-1 Domestic Tariff (2022) &nbsp;|&nbsp; CM Vijay's 200 Units Free Scheme (May 2026)</p>
+    <p>Unofficial calculator for reference only. Actual bills may vary.</p>
+  </footer>
+
+  <script src="calculator.js"></script>
+</body>
+</html>
