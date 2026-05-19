@@ -8,131 +8,136 @@
 /* ── Tariff Configuration ──────────────────────────────────── */
 
 /**
- * TANGEDCO LT-1 Domestic Slab Rates (Bi-Monthly, effective Sep 2022)
- * Each entry: { upTo: max units in slab, rate: ₹ per unit }
- * The first 100 units are FREE under the old scheme (rate = 0).
+ * TWO separate slab structures depending on total consumption:
+ *
+ * ≤ 500 units — Old CM Tariff (100 units free)
+ * ≤ 500 units — New CM Tariff (200 units free)
+ *
+ * > 500 units — Old & New CM Tariff are IDENTICAL (100 units free)
  */
-const SLABS = [
-  { upTo: 100,  rate: 0.00  },   // 0–100   : Free
-  { upTo: 200,  rate: 2.35  },   // 101–200 : ₹2.35/unit
-  { upTo: 400,  rate: 4.80  },   // 201–400 : ₹4.80/unit
-  { upTo: 500,  rate: 6.45  },   // 401–500 : ₹6.45/unit
-  { upTo: 600,  rate: 8.55  },   // 501–600 : ₹8.55/unit
-  { upTo: 800,  rate: 9.65  },   // 601–800 : ₹9.65/unit
-  { upTo: 1000, rate: 10.30 },   // 801–1000: ₹10.30/unit
-  { upTo: Infinity, rate: 11.00 } // >1000   : ₹11.00/unit
+
+// Used when total consumption ≤ 500 — Old scheme (100 free)
+const SLABS_BELOW500_OLD = [
+  { upTo: 100, rate: 0.00 },   // 0–100   : Free
+  { upTo: 200, rate: 2.35 },   // 101–200 : ₹2.35/unit
+  { upTo: 400, rate: 4.70 },   // 201–400 : ₹4.70/unit
+  { upTo: 500, rate: 6.30 },   // 401–500 : ₹6.30/unit
+];
+
+// Used when total consumption ≤ 500 — New scheme (200 free)
+const SLABS_BELOW500_NEW = [
+  { upTo: 200, rate: 0.00 },   // 0–200   : Free
+  { upTo: 400, rate: 4.70 },   // 201–400 : ₹4.70/unit
+  { upTo: 500, rate: 6.30 },   // 401–500 : ₹6.30/unit
+];
+
+// Used when total consumption > 500 — Old & New are identical (100 free)
+const SLABS_ABOVE500 = [
+  { upTo: 100,      rate: 0.00  },   // 0–100    : Free
+  { upTo: 400,      rate: 4.70  },   // 101–400  : ₹4.70/unit
+  { upTo: 500,      rate: 6.30  },   // 401–500  : ₹6.30/unit
+  { upTo: 600,      rate: 8.40  },   // 501–600  : ₹8.40/unit
+  { upTo: 800,      rate: 9.45  },   // 601–800  : ₹9.45/unit
+  { upTo: 1000,     rate: 10.50 },   // 801–1000 : ₹10.50/unit
+  { upTo: Infinity, rate: 11.55 },   // 1000+    : ₹11.55/unit
 ];
 
 /**
  * Fixed charges (bi-monthly) based on total consumption
+ * TNEB domestic tariff does not apply a separate fixed charge —
+ * all charges are covered by the energy slab rates.
  */
 function getFixedCharge(units) {
-  if (units <= 100)  return 0;
-  if (units <= 200)  return 40;
-  if (units <= 500)  return 75;
-  if (units <= 1000) return 125;
-  return 175;
+  return 0;
 }
 
 /* ── Core Billing Engine ───────────────────────────────────── */
 
 /**
- * Calculate energy charge using progressive slab billing.
- * @param {number} billableUnits - Units to be charged (after free deduction)
- * @param {number} totalUnits    - Original total units (for slab boundary reference)
+ * Walk through a given slab table and calculate energy charge.
+ * The slab table already encodes the free units (rate = 0 for free slabs).
+ *
+ * @param {number} totalUnits - Total units consumed
+ * @param {Array}  slabs      - Slab table to use
  * @returns {{ rows: Array, energyCharge: number }}
  */
-function calcSlabCharge(billableUnits, totalUnits) {
+function calcSlabCharge(totalUnits, slabs) {
   const rows = [];
-  let remaining = billableUnits;
   let energyCharge = 0;
   let prevBoundary = 0;
+  let unitsCounted = 0;
 
-  for (const slab of SLABS) {
-    if (remaining <= 0) break;
+  for (const slab of slabs) {
+    if (unitsCounted >= totalUnits) break;
 
-    const slabCapacity = slab.upTo - prevBoundary;
-    const unitsInSlab  = Math.min(remaining, slabCapacity);
+    const slabMax      = slab.upTo === Infinity ? totalUnits : Math.min(slab.upTo, totalUnits);
+    const slabCapacity = slabMax - unitsCounted;
 
-    if (unitsInSlab > 0) {
-      const amount = +(unitsInSlab * slab.rate).toFixed(2);
-      energyCharge += amount;
-      rows.push({
-        slab:   slab.upTo === Infinity
-                  ? `${prevBoundary + 1} & above`
-                  : `${prevBoundary + 1} – ${slab.upTo}`,
-        units:  unitsInSlab,
-        rate:   slab.rate,
-        amount: amount,
-        isFree: slab.rate === 0
-      });
+    if (slabCapacity <= 0) {
+      prevBoundary = slab.upTo === Infinity ? totalUnits : slab.upTo;
+      continue;
     }
 
-    remaining    -= unitsInSlab;
-    prevBoundary  = slab.upTo;
+    const amount = +(slabCapacity * slab.rate).toFixed(2);
+    energyCharge += amount;
+
+    rows.push({
+      slab:   slab.upTo === Infinity
+                ? `${prevBoundary + 1} & above`
+                : `${prevBoundary + 1} – ${slab.upTo}`,
+      units:  slabCapacity,
+      rate:   slab.rate,
+      amount: amount,
+      isFree: slab.rate === 0
+    });
+
+    unitsCounted  = slabMax;
+    prevBoundary  = slab.upTo === Infinity ? totalUnits : slab.upTo;
   }
 
   return { rows, energyCharge: +energyCharge.toFixed(2) };
 }
 
 /**
- * OLD BILL: First 100 units free for ALL domestic consumers.
- * Remaining units billed at progressive slab rates.
- * @param {number} units - Total bi-monthly consumption
- * @returns {object} Full bill breakdown
+ * OLD BILL:
+ * - ≤ 500 units → use SLABS_BELOW500_OLD (0–100 free, then 2.35/4.70/6.30)
+ * - > 500 units → use SLABS_ABOVE500     (0–100 free, then 4.70/6.30/8.40/9.45/10.50/11.55)
  */
 function calcOldBill(units) {
-  const freeUnits    = Math.min(units, 100);
-  const billable     = Math.max(0, units - freeUnits);
-  const { rows, energyCharge } = calcSlabCharge(billable, units);
-  const fixedCharge  = getFixedCharge(units);
-  const totalAmount  = +(energyCharge + fixedCharge).toFixed(2);
-
-  // Prepend free-units row for display
-  const displayRows = [
-    { slab: '0 – 100', units: freeUnits, rate: 0, amount: 0, isFree: true },
-    ...rows
-  ];
+  const slabs       = units <= 500 ? SLABS_BELOW500_OLD : SLABS_ABOVE500;
+  const freeUnits   = 100;
+  const billable    = Math.max(0, units - freeUnits);
+  const { rows, energyCharge } = calcSlabCharge(units, slabs);
+  const fixedCharge = getFixedCharge(units);
+  const totalAmount = +(energyCharge + fixedCharge).toFixed(2);
 
   return {
     units, freeUnits, billable,
     energyCharge, fixedCharge, totalAmount,
-    rows: displayRows,
-    scheme: 'Old (100 Units Free)'
+    rows,
+    scheme: 'Old CM Tariff'
   };
 }
 
 /**
  * NEW BILL (2026 CM Vijay Scheme):
- * - Consumers using ≤ 500 units bimonthly → 200 units FREE
- * - Consumers using > 500 units bimonthly → 100 units FREE (old scheme continues)
- * @param {number} units - Total bi-monthly consumption
- * @returns {object} Full bill breakdown
+ * - ≤ 500 units → use SLABS_BELOW500_NEW (0–200 free, then 4.70/6.30)
+ * - > 500 units → use SLABS_ABOVE500     (0–100 free, same as old — UNCHANGED)
  */
 function calcNewBill(units) {
-  const eligible  = units <= 500;
-  const freeUnits = eligible ? Math.min(units, 200) : Math.min(units, 100);
-  const billable  = Math.max(0, units - freeUnits);
-  const { rows, energyCharge } = calcSlabCharge(billable, units);
-  const fixedCharge = eligible && units <= 200 ? 0 : getFixedCharge(units);
+  const eligible    = units <= 500;
+  const slabs       = eligible ? SLABS_BELOW500_NEW : SLABS_ABOVE500;
+  const freeUnits   = eligible ? 200 : 100;
+  const billable    = Math.max(0, units - freeUnits);
+  const { rows, energyCharge } = calcSlabCharge(units, slabs);
+  const fixedCharge = getFixedCharge(units);
   const totalAmount = +(energyCharge + fixedCharge).toFixed(2);
-
-  const displayRows = [
-    {
-      slab:   eligible ? '0 – 200 (Free)' : '0 – 100 (Free)',
-      units:  freeUnits,
-      rate:   0,
-      amount: 0,
-      isFree: true
-    },
-    ...rows
-  ];
 
   return {
     units, freeUnits, billable, eligible,
     energyCharge, fixedCharge, totalAmount,
-    rows: displayRows,
-    scheme: eligible ? 'New (200 Units Free – 2026)' : 'New (100 Units Free – >500 units)'
+    rows,
+    scheme: eligible ? 'New CM Tariff (200 Units Free – 2026)' : 'New CM Tariff (>500 units – Unchanged)'
   };
 }
 
@@ -405,11 +410,9 @@ function calculate() {
   document.getElementById('breakdownToggleText').textContent = 'Show Details ▼';
   switchTab('old');
 
-  // Store for PDF export
+  // Store for scroll
   window._lastOldBill = oldBill;
   window._lastNewBill = newBill;
-  window._lastSavings = savings;
-  window._lastSavingsPct = savingsPct;
 
   // Smooth scroll to results
   setTimeout(() => {
@@ -467,142 +470,4 @@ document.getElementById('units').addEventListener('input', e => {
   else document.getElementById('eligibilityBanner').style.display = 'none';
 });
 
-/* ── PDF Export ────────────────────────────────────────────── */
-function exportPDF() {
-  const old = window._lastOldBill;
-  const nw  = window._lastNewBill;
-  if (!old || !nw) { alert('Please calculate a bill first.'); return; }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-  const pageW = doc.internal.pageSize.getWidth();
-  const margin = 15;
-  let y = 20;
-
-  // ── Header ──
-  doc.setFillColor(192, 57, 43);
-  doc.rect(0, 0, pageW, 14, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(13);
-  doc.setFont('helvetica', 'bold');
-  doc.text('TNEB Bill Comparison Report', pageW / 2, 9, { align: 'center' });
-
-  doc.setTextColor(50, 50, 50);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text('TANGEDCO Domestic Consumer (LT-1) | Generated: ' + new Date().toLocaleDateString('en-IN'), pageW / 2, y, { align: 'center' });
-  y += 10;
-
-  // ── Consumer Info ──
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Consumer Details', margin, y);
-  y += 6;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.text(`Units Consumed (Bi-Monthly): ${old.units} kWh`, margin, y); y += 5;
-  doc.text(`Consumer Type: Domestic (LT-1)`, margin, y); y += 5;
-  doc.text(`Eligibility: ${nw.eligible ? '✓ Eligible for 200 Units Free Scheme (≤500 units)' : '✗ Not eligible (>500 units) – 100 units free applies'}`, margin, y);
-  y += 10;
-
-  // ── Summary Box ──
-  doc.setFillColor(245, 245, 245);
-  doc.roundedRect(margin, y, pageW - margin * 2, 28, 3, 3, 'F');
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(192, 57, 43);
-  doc.text('Old Bill (100 Free):', margin + 5, y + 8);
-  doc.setTextColor(39, 174, 96);
-  doc.text('New Bill (200 Free):', margin + 5, y + 16);
-  doc.setTextColor(243, 156, 18);
-  doc.text('You Save:', margin + 5, y + 24);
-
-  doc.setTextColor(50, 50, 50);
-  doc.text('₹' + old.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 }), pageW - margin - 5, y + 8, { align: 'right' });
-  doc.text('₹' + nw.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 }), pageW - margin - 5, y + 16, { align: 'right' });
-  doc.text('₹' + (old.totalAmount - nw.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 }) + ' (' + window._lastSavingsPct + '%)', pageW - margin - 5, y + 24, { align: 'right' });
-  y += 36;
-
-  // ── Helper: draw a slab table ──
-  function drawTable(title, bill, startY) {
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(50, 50, 50);
-    doc.text(title, margin, startY);
-    startY += 5;
-
-    const cols = ['Slab', 'Units', 'Rate (₹/unit)', 'Amount (₹)'];
-    const colW  = [(pageW - margin * 2) * 0.35, 0.2, 0.2, 0.25].map(r => (pageW - margin * 2) * r);
-    let cx = margin;
-
-    // Header row
-    doc.setFillColor(192, 57, 43);
-    doc.rect(margin, startY, pageW - margin * 2, 7, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    cols.forEach((col, i) => {
-      doc.text(col, cx + 2, startY + 5);
-      cx += colW[i];
-    });
-    startY += 7;
-
-    // Data rows
-    bill.rows.forEach((row, idx) => {
-      doc.setFillColor(idx % 2 === 0 ? 250 : 242, idx % 2 === 0 ? 250 : 242, idx % 2 === 0 ? 250 : 242);
-      doc.rect(margin, startY, pageW - margin * 2, 6, 'F');
-      doc.setTextColor(row.isFree ? 39 : 50, row.isFree ? 174 : 50, row.isFree ? 96 : 50);
-      doc.setFont('helvetica', row.isFree ? 'italic' : 'normal');
-      doc.setFontSize(8);
-      cx = margin;
-      const vals = [
-        row.slab,
-        row.units + ' units',
-        row.isFree ? 'FREE' : '₹' + row.rate.toFixed(2),
-        row.isFree ? '₹0.00' : '₹' + row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
-      ];
-      vals.forEach((v, i) => {
-        doc.text(v, cx + 2, startY + 4);
-        cx += colW[i];
-      });
-      startY += 6;
-    });
-
-    // Fixed charge row
-    if (bill.fixedCharge > 0) {
-      doc.setFillColor(255, 248, 220);
-      doc.rect(margin, startY, pageW - margin * 2, 6, 'F');
-      doc.setTextColor(50, 50, 50);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.text('Fixed Charge (Bi-Monthly)', margin + 2, startY + 4);
-      doc.text('₹' + bill.fixedCharge.toFixed(2), pageW - margin - 2, startY + 4, { align: 'right' });
-      startY += 6;
-    }
-
-    // Total row
-    doc.setFillColor(192, 57, 43);
-    doc.rect(margin, startY, pageW - margin * 2, 7, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('Total Bill Amount', margin + 2, startY + 5);
-    doc.text('₹' + bill.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 }), pageW - margin - 2, startY + 5, { align: 'right' });
-    startY += 12;
-
-    return startY;
-  }
-
-  y = drawTable('Old Bill Slab Breakdown (100 Units Free)', old, y);
-  if (y > 220) { doc.addPage(); y = 20; }
-  y = drawTable('New Bill Slab Breakdown (200 Units Free – 2026 Scheme)', nw, y);
-
-  // ── Footer ──
-  doc.setFontSize(7);
-  doc.setTextColor(150, 150, 150);
-  doc.setFont('helvetica', 'italic');
-  doc.text('This is an unofficial calculator for reference only. Actual bills may vary. | TANGEDCO LT-1 Domestic Tariff (2022)', pageW / 2, 290, { align: 'center' });
-
-  doc.save(`TNEB_Bill_${old.units}units_${new Date().toISOString().slice(0,10)}.pdf`);
-}
