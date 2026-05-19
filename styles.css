@@ -511,7 +511,14 @@ body {
 .btn-pdf:active { transform: translateY(0); }
 
 /* ── Tariff reference ── */
-.tariff-ref { }
+.tariff-section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid var(--border);
+}
 
 .tariff-grid {
   display: grid;
