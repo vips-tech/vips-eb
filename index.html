@@ -7,7 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -137,46 +136,77 @@
         </div>
       </div>
 
-      <!-- Export -->
-      <button class="btn-pdf" onclick="exportPDF()">📄 Download Bill as PDF</button>
+
 
     </section>
 
     <!-- ── TARIFF REFERENCE ── -->
     <section class="section-card tariff-ref">
       <div class="section-label">Tariff Reference — TANGEDCO LT-1 Domestic</div>
+
+      <!-- Below 500 units -->
+      <div class="tariff-section-title">Consumption ≤ 500 Units</div>
       <div class="tariff-grid">
         <div>
-          <div class="tariff-head">Energy Charges (Bi-Monthly)</div>
+          <div class="tariff-head">Old CM Tariff (100 Units Free)</div>
           <table class="ref-table">
             <thead><tr><th>Units</th><th>Rate (₹ / unit)</th></tr></thead>
             <tbody>
               <tr><td>0 – 100</td><td class="free-tag">FREE</td></tr>
               <tr><td>101 – 200</td><td>₹ 2.35</td></tr>
-              <tr><td>201 – 400</td><td>₹ 4.80</td></tr>
-              <tr><td>401 – 500</td><td>₹ 6.45</td></tr>
-              <tr><td>501 – 600</td><td>₹ 8.55</td></tr>
-              <tr><td>601 – 800</td><td>₹ 9.65</td></tr>
-              <tr><td>801 – 1000</td><td>₹ 10.30</td></tr>
-              <tr><td>Above 1000</td><td>₹ 11.00</td></tr>
+              <tr><td>201 – 400</td><td>₹ 4.70</td></tr>
+              <tr><td>401 – 500</td><td>₹ 6.30</td></tr>
             </tbody>
           </table>
         </div>
         <div>
-          <div class="tariff-head">Fixed Charges (Bi-Monthly)</div>
+          <div class="tariff-head">New CM Tariff (200 Units Free – 2026)</div>
           <table class="ref-table">
-            <thead><tr><th>Consumption</th><th>Fixed Charge</th></tr></thead>
+            <thead><tr><th>Units</th><th>Rate (₹ / unit)</th></tr></thead>
             <tbody>
-              <tr><td>0 – 100 units</td><td class="free-tag">₹ 0</td></tr>
-              <tr><td>101 – 200 units</td><td>₹ 40</td></tr>
-              <tr><td>201 – 500 units</td><td>₹ 75</td></tr>
-              <tr><td>501 – 1000 units</td><td>₹ 125</td></tr>
-              <tr><td>Above 1000 units</td><td>₹ 175</td></tr>
+              <tr><td>0 – 200</td><td class="free-tag">FREE</td></tr>
+              <tr><td>201 – 400</td><td>₹ 4.70</td></tr>
+              <tr><td>401 – 500</td><td>₹ 6.30</td></tr>
             </tbody>
           </table>
-          <div class="scheme-box">
+        </div>
+      </div>
+
+      <!-- Above 500 units -->
+      <div class="tariff-section-title" style="margin-top:1.5rem;">Consumption &gt; 500 Units (Old &amp; New — Unchanged)</div>
+      <div class="tariff-grid">
+        <div>
+          <div class="tariff-head">Old CM Tariff</div>
+          <table class="ref-table">
+            <thead><tr><th>Units</th><th>Rate (₹ / unit)</th></tr></thead>
+            <tbody>
+              <tr><td>0 – 100</td><td class="free-tag">FREE</td></tr>
+              <tr><td>101 – 400</td><td>₹ 4.70</td></tr>
+              <tr><td>401 – 500</td><td>₹ 6.30</td></tr>
+              <tr><td>501 – 600</td><td>₹ 8.40</td></tr>
+              <tr><td>601 – 800</td><td>₹ 9.45</td></tr>
+              <tr><td>801 – 1000</td><td>₹ 10.50</td></tr>
+              <tr><td>1000+</td><td>₹ 11.55</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div class="tariff-head">New CM Tariff (Same as Old)</div>
+          <table class="ref-table">
+            <thead><tr><th>Units</th><th>Rate (₹ / unit)</th></tr></thead>
+            <tbody>
+              <tr><td>0 – 100</td><td class="free-tag">FREE</td></tr>
+              <tr><td>101 – 400</td><td>₹ 4.70</td></tr>
+              <tr><td>401 – 500</td><td>₹ 6.30</td></tr>
+              <tr><td>501 – 600</td><td>₹ 8.40</td></tr>
+              <tr><td>601 – 800</td><td>₹ 9.45</td></tr>
+              <tr><td>801 – 1000</td><td>₹ 10.50</td></tr>
+              <tr><td>1000+</td><td>₹ 11.55</td></tr>
+            </tbody>
+          </table>
+          <div class="scheme-box" style="margin-top:1rem;">
             <div class="scheme-row"><span class="dot dot-red"></span><strong>Old Scheme:</strong> First 100 units free for all consumers</div>
-            <div class="scheme-row"><span class="dot dot-green"></span><strong>New Scheme (2026):</strong> First 200 units free if consumption ≤ 500 units/bimonth</div>
+            <div class="scheme-row"><span class="dot dot-green"></span><strong>New Scheme (2026):</strong> First 200 units free if consumption ≤ 500 units/bimonth. Above 500 units — no change.</div>
           </div>
         </div>
       </div>
